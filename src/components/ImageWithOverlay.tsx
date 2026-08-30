@@ -74,12 +74,12 @@ export const ImageWithOverlay: React.FC<ImageWithOverlayProps> = ({
             >
               {/* Proofreading mark style numbered badge */}
               <span
-                className={`absolute -top-3 -left-3 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-serif transition-transform border border-[var(--accent-red)] bg-transparent ${
+                className={`absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-sans font-bold transition-transform border-[1.5px] border-[var(--accent-red)] ${
                   isSelected 
-                    ? 'scale-125 text-[var(--accent-red)] font-bold border-2' 
-                    : 'text-[var(--accent-red)] border-[1.5px]'
+                    ? 'scale-125 text-white bg-[var(--accent-red)] z-30 shadow-md' 
+                    : 'text-[var(--accent-red)] bg-page z-20 shadow-sm'
                 }`}
-                style={{ transform: `rotate(${Math.sin(index) * 15}deg)` }} // Slight random rotation for hand-drawn feel
+                style={{ transform: `rotate(${Math.sin(index) * 15}deg)` }}
               >
                 {index + 1}
               </span>
