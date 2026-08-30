@@ -21,7 +21,6 @@ function toMyMemoryCode(code: string): string {
   return code.split('-')[0];                 // ja-JP → ja, en-US → en
 }
 
-}
 
 // Translate a single text string via MyMemory API (free, no key needed)
 async function translateWithMyMemory(text: string, sourceLang: string, targetLang: string): Promise<string> {
@@ -306,7 +305,8 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
       // ── Last resort: OCR-only Gemini + MyMemory translation ──
       if (!response) {
         console.warn('All Gemini full-pipeline attempts failed. Trying OCR-only + MyMemory fallback...');
-        let ocrOnlyResponse;
+        try {
+          let ocrOnlyResponse;
         
         ocrLoop: for (const ai of aiClients) {
           try {
