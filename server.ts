@@ -188,23 +188,40 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
         },
       };
 
+      // Retry logic with fallback model chain
+      const modelChain = [selectedModel, 'gemini-3.1-flash-lite'];
       let response;
-      try {
-        response = await ai.models.generateContent({
-          model: selectedModel,
-          ...requestPayload
-        });
-      } catch (initialErr: any) {
-        // Fallback to flash-lite if the selected model is overloaded (503)
-        if (initialErr.message && initialErr.message.includes('503')) {
-          console.warn(`Model ${selectedModel} is overloaded (503). Falling back to gemini-3.1-flash-lite...`);
-          response = await ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
-            ...requestPayload
-          });
-        } else {
-          throw initialErr;
+      let lastError: any = null;
+
+      for (const model of modelChain) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            response = await ai.models.generateContent({
+              model,
+              ...requestPayload
+            });
+            break; // Success — exit retry loop
+          } catch (err: any) {
+            lastError = err;
+            const msg = err.message || '';
+
+            if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED')) {
+              // Wait before retrying: 2s, 4s, 8s
+              const delay = Math.pow(2, attempt + 1) * 1000;
+              console.warn(`Model ${model} attempt ${attempt + 1} failed (${msg.substring(0, 80)}). Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+
+            // Non-retryable error — break to try next model
+            break;
+          }
         }
+        if (response) break; // Got a response, stop trying other models
+      }
+
+      if (!response) {
+        throw lastError || new Error('所有模型皆無法回應');
       }
 
       const rawText = response.text || '[]';

@@ -37,7 +37,7 @@ export const ImageWithOverlay: React.FC<ImageWithOverlayProps> = ({
           const isSelected = selectedItemId === item.id;
 
           if (viewMode === 'text') {
-            // Text Replacement Mode — solid dark overlay, large white text
+            // Text Replacement Mode — solid dark overlay with gaps between boxes
             return (
               <div
                 key={item.id}
@@ -46,21 +46,26 @@ export const ImageWithOverlay: React.FC<ImageWithOverlayProps> = ({
                   onSelectItem(item);
                 }}
                 style={{ top, left, width, height }}
-                className={`absolute transition-all cursor-pointer pointer-events-auto overflow-hidden ${
-                  isSelected ? 'z-20 ring-2 ring-yellow-400 shadow-lg' : 'z-10'
-                }`}
+                className="absolute z-10 pointer-events-auto"
               >
-                {/* Solid dark background for maximum readability */}
-                <div className="absolute inset-0 bg-black/85" />
+                {/* Inner box with 1px inset to create gaps between adjacent items */}
+                <div
+                  className={`absolute inset-[1px] cursor-pointer overflow-hidden rounded-sm ${
+                    isSelected ? 'ring-2 ring-yellow-400 shadow-lg z-20' : ''
+                  }`}
+                >
+                  {/* Solid dark background */}
+                  <div className="absolute inset-0 bg-black/85" />
 
-                {/* Translation text — fill the entire box */}
-                <div className="relative z-10 w-full h-full flex items-center justify-center p-1">
-                  <span
-                    className="text-white font-sans font-bold text-center leading-tight drop-shadow-md"
-                    style={{ fontSize: 'clamp(10px, 3vw, 15px)' }}
-                  >
-                    {item.translation}
-                  </span>
+                  {/* Translation text */}
+                  <div className="relative z-10 w-full h-full flex items-center justify-center px-1">
+                    <span
+                      className="text-white font-sans font-bold text-center leading-tight drop-shadow-md"
+                      style={{ fontSize: 'clamp(9px, 2.5vw, 14px)' }}
+                    >
+                      {item.translation}
+                    </span>
+                  </div>
                 </div>
               </div>
             );
