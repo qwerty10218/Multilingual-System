@@ -384,7 +384,86 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
     }
   });
 
-  // 3. Cultural & Dietary Context Detail Generator API
+  // 3. Text Translation API (Pure Text)
+  app.post('/api/text-translate', async (req, res) => {
+    try {
+      const { text, targetLanguage = '繁體中文', customNote = '', model = 'gemini-3.6-flash' } = req.body;
+
+      if (!text || !text.trim()) {
+        return res.status(400).json({ error: '請提供欲翻譯的文字' });
+      }
+
+      const ai = getAiClient();
+      const validModels = ['gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
+      const selectedModel = validModels.includes(model) ? model : 'gemini-3.6-flash';
+
+      const systemPrompt = `你是一個專業的多語系翻譯官。
+請將以下文字翻譯成：${targetLanguage}。
+${customNote ? `特別補充需求：${customNote}` : ''}
+請注意保留原文的語氣與格式。
+請只輸出翻譯後的文字，不要包含任何其他解釋或 markdown 標籤。
+
+欲翻譯文字：
+${text}`;
+
+      let translatedText = '';
+      let lastError: any = null;
+
+      // Retry logic with fallback model chain
+      const modelChain = [selectedModel, 'gemini-3.1-flash-lite'];
+      for (const currentModel of modelChain) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await ai.models.generateContent({
+              model: currentModel,
+              contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+            });
+            translatedText = (response.text || '').trim();
+            break;
+          } catch (err: any) {
+            lastError = err;
+            const msg = err.message || '';
+            if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED')) {
+              const delay = Math.pow(2, attempt + 1) * 1000;
+              console.warn(`Text Translation: Model ${currentModel} attempt ${attempt + 1} failed. Retrying in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+            break;
+          }
+        }
+        if (translatedText) break;
+      }
+
+      // Last resort: MyMemory API Fallback
+      if (!translatedText) {
+        console.warn('Text Translation: All Gemini attempts failed. Trying MyMemory fallback...');
+        try {
+          const targetCode = TARGET_LANG_TO_CODE[targetLanguage] || 'en';
+          // auto detect source via MyMemory
+          translatedText = await translateWithMyMemory(text, 'auto', targetCode);
+          if (translatedText === text) {
+             throw new Error('MyMemory failed to translate.');
+          }
+        } catch (fallbackErr: any) {
+          console.error('MyMemory text fallback also failed:', fallbackErr);
+          throw lastError || fallbackErr || new Error('所有翻譯服務皆無法回應');
+        }
+      }
+
+      res.json({ success: true, translation: translatedText });
+    } catch (err: any) {
+      console.error('Text Translate API Error:', err);
+      let errorMessage = '無法翻譯文字，請稍後再試。';
+      if (err.message) {
+        if (err.message.includes('503')) errorMessage = 'Google AI 伺服器目前過度擁擠（503），請稍後再試。';
+        else if (err.message.includes('429')) errorMessage = 'API 請求次數已達上限，請稍後再試。';
+      }
+      res.status(500).json({ success: false, error: errorMessage });
+    }
+  });
+
+  // 4. Cultural & Dietary Context Detail Generator API
   app.post('/api/cultural-explain', async (req, res) => {
     try {
       const { original, translation, category, targetLanguage = '繁體中文' } = req.body;

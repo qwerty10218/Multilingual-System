@@ -3,6 +3,8 @@ import { Camera, Sun, Moon, Monitor } from 'lucide-react';
 import { TARGET_LANGUAGES } from '../data/samples';
 
 interface TopBarProps {
+  appMode: 'image' | 'text';
+  onAppModeChange: (mode: 'image' | 'text') => void;
   targetLanguage: string;
   onTargetLanguageChange: (lang: string) => void;
   theme: 'light' | 'dark' | 'system';
@@ -13,6 +15,8 @@ interface TopBarProps {
 const THEME_CYCLE: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
 
 export const TopBar: React.FC<TopBarProps> = ({
+  appMode,
+  onAppModeChange,
   targetLanguage,
   onTargetLanguageChange,
   theme,
@@ -32,10 +36,10 @@ export const TopBar: React.FC<TopBarProps> = ({
       className="sticky top-0 z-40 w-full bg-[var(--bg-page)]/95 border-b border-[var(--text-main)]/10"
       style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="flex items-center justify-between px-4 h-14">
-        {/* Left: Logo */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="w-6 h-6 flex items-center justify-center text-[var(--accent-red)]">
+      <div className="flex items-center justify-between px-3 sm:px-4 h-14">
+        {/* Left: Logo (hidden on very small screens to make room for tabs) */}
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
+          <div className="w-5 h-5 flex items-center justify-center text-[var(--accent-red)]">
             <Camera className="w-5 h-5" />
           </div>
           <span className="text-base font-serif font-bold text-[var(--text-main)] tracking-tight">
@@ -43,13 +47,39 @@ export const TopBar: React.FC<TopBarProps> = ({
           </span>
           {isProcessing && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent-red)] border border-[var(--accent-red)]/30 animate-pulse">
-              辨識中
+              解讀中...
             </span>
           )}
         </div>
 
-        {/* Right: Language Selector + Theme Toggle */}
-        <div className="flex items-center gap-3">
+        {/* Center: Mode Segmented Control */}
+        <div className="flex-1 flex justify-start sm:justify-center">
+          <div className="flex bg-[var(--text-main)]/5 p-0.5 rounded-lg border border-[var(--text-main)]/10">
+            <button
+              onClick={() => onAppModeChange('image')}
+              className={`px-3 py-1 rounded-md text-[13px] font-bold transition-all ${
+                appMode === 'image'
+                  ? 'bg-white dark:bg-[#28211d] text-[var(--text-main)] shadow-sm'
+                  : 'text-[var(--text-main)]/50'
+              }`}
+            >
+              📸 視覺
+            </button>
+            <button
+              onClick={() => onAppModeChange('text')}
+              className={`px-3 py-1 rounded-md text-[13px] font-bold transition-all ${
+                appMode === 'text'
+                  ? 'bg-white dark:bg-[#28211d] text-[var(--text-main)] shadow-sm'
+                  : 'text-[var(--text-main)]/50'
+              }`}
+            >
+              📝 文字
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-1 shrink-0">
           {/* Language Select */}
           <div className="relative flex items-center">
             <select

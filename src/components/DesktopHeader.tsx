@@ -14,6 +14,8 @@ import { TranslationScene, SCENE_OPTIONS } from '../types';
 import { TARGET_LANGUAGES } from '../data/samples';
 
 interface DesktopHeaderProps {
+  appMode: 'image' | 'text';
+  onAppModeChange: (mode: 'image' | 'text') => void;
   targetLanguage: string;
   onTargetLanguageChange: (lang: string) => void;
   selectedModel: string;
@@ -30,9 +32,9 @@ interface DesktopHeaderProps {
 }
 
 const AI_MODELS = [
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
+  { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+  { value: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro' },
+  { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash-Lite' },
 ];
 
 const THEME_ICONS = {
@@ -44,6 +46,8 @@ const THEME_ICONS = {
 const THEME_CYCLE: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
 
 export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
+  appMode,
+  onAppModeChange,
   targetLanguage,
   onTargetLanguageChange,
   selectedModel,
@@ -75,18 +79,42 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         <button
           type="button"
           onClick={onReset}
-          className="flex items-center gap-2 shrink-0 group"
+          className="flex items-center gap-2 shrink-0 group mr-4"
           title="返回首頁"
         >
           <div className="w-6 h-6 flex items-center justify-center text-[var(--accent-red)]">
             <Camera className="w-5 h-5" />
           </div>
           <span className="text-lg font-serif font-bold text-[var(--text-main)] whitespace-nowrap hidden lg:block">
-            多語系視覺 OCR
+            視覺翻譯官
           </span>
         </button>
 
-        <div className="w-px h-4 bg-[var(--text-main)]/20 shrink-0" />
+        {/* ── 雙模式切換 Tabs ── */}
+        <div className="flex bg-[var(--text-main)]/5 p-1 rounded-lg shrink-0 border border-[var(--text-main)]/10">
+          <button
+            onClick={() => onAppModeChange('image')}
+            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+              appMode === 'image'
+                ? 'bg-white dark:bg-[#28211d] text-[var(--text-main)] shadow-sm'
+                : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
+            }`}
+          >
+            📸 視覺翻譯
+          </button>
+          <button
+            onClick={() => onAppModeChange('text')}
+            className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${
+              appMode === 'text'
+                ? 'bg-white dark:bg-[#28211d] text-[var(--text-main)] shadow-sm'
+                : 'text-[var(--text-main)]/50 hover:text-[var(--text-main)]'
+            }`}
+          >
+            📝 文字翻譯
+          </button>
+        </div>
+
+        <div className="w-px h-4 bg-[var(--text-main)]/20 shrink-0 mx-2 hidden md:block" />
 
         {/* ── 中間：場景選擇 chips ── */}
         <div className="flex-1 min-w-0 flex items-center gap-4 overflow-x-auto no-scrollbar py-1">

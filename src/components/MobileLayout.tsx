@@ -7,8 +7,11 @@ import { PocketbookPage } from '../pages/PocketbookPage';
 import { AssistantPage } from '../pages/AssistantPage';
 import { CulturalModal } from './CulturalModal';
 import { OCRItem, SavedItem, SampleImage, TranslationScene } from '../types';
+import { TextTranslationPage } from '../pages/TextTranslationPage';
 
 interface MobileLayoutProps {
+  appMode: 'image' | 'text';
+  onAppModeChange: (mode: 'image' | 'text') => void;
   imageUrl: string | null;
   ocrItems: OCRItem[];
   isProcessing: boolean;
@@ -37,6 +40,8 @@ interface MobileLayoutProps {
 }
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({
+  appMode,
+  onAppModeChange,
   imageUrl,
   ocrItems,
   isProcessing,
@@ -46,6 +51,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   savedItemIds,
   culturalModalItem,
   targetLanguage,
+  selectedModel,
   selectedScene,
   theme,
   onImageSelected,
@@ -65,7 +71,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
   const handleTabChange = (tab: TabId) => {
     // When there's an image loaded, camera tab becomes back button
-    if (tab === 'camera' && imageUrl) {
+    if (tab === 'camera' && imageUrl && appMode === 'image') {
       setActiveTab('gallery');
     } else {
       setActiveTab(tab);
@@ -84,6 +90,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   return (
     <div className="h-dvh flex flex-col overflow-hidden bg-page">
       <TopBar
+        appMode={appMode}
+        onAppModeChange={onAppModeChange}
         targetLanguage={targetLanguage}
         onTargetLanguageChange={onTargetLanguageChange}
         theme={theme}
@@ -93,7 +101,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
 
       {/* relative so the FAB's absolute positioning works */}
       <main className="flex-1 overflow-hidden relative">
-        {activeTab === 'gallery' && (
+        {appMode === 'text' && activeTab === 'gallery' ? (
+           <TextTranslationPage targetLanguage={targetLanguage} selectedModel={selectedModel} />
+        ) : activeTab === 'gallery' ? (
           <GalleryPage
             imageUrl={imageUrl}
             ocrItems={ocrItems}
@@ -112,7 +122,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onRequestOcr={onRequestOcr}
             onReset={onReset}
           />
-        )}
+        ) : null}
 
         {activeTab === 'camera' && (
           <CameraPage onCapture={handleCapture} onBack={handleBack} />
@@ -137,6 +147,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       </main>
 
       <BottomTabBar
+        appMode={appMode}
         activeTab={activeTab}
         onTabChange={handleTabChange}
         pocketCount={savedItems.length}

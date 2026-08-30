@@ -1,30 +1,49 @@
 import React from 'react';
-import { ImageIcon, Camera, Bookmark, Bot, ArrowLeft } from 'lucide-react';
+import { ImageIcon, Camera, Bookmark, Bot, ArrowLeft, Type } from 'lucide-react';
 
 export type TabId = 'gallery' | 'camera' | 'pocketbook' | 'assistant';
 
 interface BottomTabBarProps {
+  appMode: 'image' | 'text';
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
   pocketCount: number;
-  hasImage: boolean; // 有圖片時拍照 Tab 換成返回 icon
+  hasImage: boolean;
 }
 
 interface TabConfig {
   id: TabId;
-  label: string;
-  Icon: React.ElementType;
+  getLabel: (mode: 'image' | 'text', hasImg: boolean) => string;
+  getIcon: (mode: 'image' | 'text', hasImg: boolean) => React.ElementType;
   isMain?: boolean;
 }
 
 const TABS: TabConfig[] = [
-  { id: 'gallery', label: '相簿', Icon: ImageIcon },
-  { id: 'camera', label: '拍照', Icon: Camera, isMain: true },
-  { id: 'pocketbook', label: '口袋書', Icon: Bookmark },
-  { id: 'assistant', label: 'AI 助手', Icon: Bot },
+  { 
+    id: 'gallery', 
+    getLabel: (mode) => mode === 'image' ? '相簿' : '翻譯', 
+    getIcon: (mode) => mode === 'image' ? ImageIcon : Type 
+  },
+  { 
+    id: 'camera', 
+    getLabel: (mode, hasImg) => (mode === 'image' && hasImg) ? '返回' : '拍照', 
+    getIcon: (mode, hasImg) => (mode === 'image' && hasImg) ? ArrowLeft : Camera, 
+    isMain: true 
+  },
+  { 
+    id: 'pocketbook', 
+    getLabel: () => '口袋書', 
+    getIcon: () => Bookmark 
+  },
+  { 
+    id: 'assistant', 
+    getLabel: () => 'AI 助手', 
+    getIcon: () => Bot 
+  },
 ];
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
+  appMode,
   activeTab,
   onTabChange,
   pocketCount,
@@ -39,9 +58,8 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       <div className="flex items-end justify-around h-[68px]">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
-          const isCamera = tab.id === 'camera';
-          const Icon = isCamera && hasImage ? ArrowLeft : tab.Icon;
-          const label = isCamera && hasImage ? '返回' : tab.label;
+          const Icon = tab.getIcon(appMode, hasImage);
+          const label = tab.getLabel(appMode, hasImage);
 
           if (tab.isMain) {
             return (

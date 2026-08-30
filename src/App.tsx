@@ -29,6 +29,7 @@ export default function App() {
   }, [theme]);
 
   // ─── App state ────────────────────────────────────────────────────────────
+  const [appMode, setAppMode] = useState<'image' | 'text'>('image');
   const [targetLanguage, setTargetLanguage] = useState<string>('繁體中文');
   const [selectedModel, setSelectedModel] = useState<string>('gemini-3.6-flash');
   const [selectedScene, setSelectedScene] = useState<TranslationScene>('auto');
@@ -155,6 +156,8 @@ export default function App() {
 
   // Shared props for both layouts
   const sharedProps = {
+    appMode,
+    onAppModeChange: setAppMode,
     imageUrl,
     ocrItems,
     isProcessing,

@@ -6,8 +6,11 @@ import { DesktopResultPanel } from './DesktopResultPanel';
 import { PocketBookModal } from './PocketBookModal';
 import { GeminiAssistantDrawer } from './GeminiAssistantDrawer';
 import { CulturalModal } from './CulturalModal';
+import { TextTranslationPage } from '../pages/TextTranslationPage';
 
 interface DesktopLayoutProps {
+  appMode: 'image' | 'text';
+  onAppModeChange: (mode: 'image' | 'text') => void;
   // 核心狀態
   imageUrl: string | null;
   ocrItems: OCRItem[];
@@ -39,6 +42,8 @@ interface DesktopLayoutProps {
 }
 
 export const DesktopLayout: React.FC<DesktopLayoutProps> = ({
+  appMode,
+  onAppModeChange,
   imageUrl,
   ocrItems,
   isProcessing,
@@ -72,6 +77,8 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({
     <div className="min-h-screen flex flex-col bg-page">
       {/* ── 頂部導覽列 ── */}
       <DesktopHeader
+        appMode={appMode}
+        onAppModeChange={onAppModeChange}
         targetLanguage={targetLanguage}
         onTargetLanguageChange={onTargetLanguageChange}
         selectedModel={selectedModel}
@@ -89,7 +96,12 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({
 
       {/* ── 主內容區 ── */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-6">
-        {!imageUrl ? (
+        {appMode === 'text' ? (
+          <TextTranslationPage
+            targetLanguage={targetLanguage}
+            selectedModel={selectedModel}
+          />
+        ) : !imageUrl ? (
           /* 無圖片：單欄置中布局 */
           <div className="max-w-2xl mx-auto">
             <DesktopUploadPanel
