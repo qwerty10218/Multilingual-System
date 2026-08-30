@@ -87,33 +87,48 @@ export function speakText(text: string, langHint?: string) {
 
   window.speechSynthesis.cancel(); // Stop current
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  
-  // Use exact language hint if provided and looks like a language code
-  if (langHint && /^[a-z]{2}(-[A-Z]{2})?$/.test(langHint)) {
-    utterance.lang = langHint;
-  } else if (langHint === '日本語') {
-    utterance.lang = 'ja-JP';
-  } else if (langHint === '한국어') {
-    utterance.lang = 'ko-KR';
-  } else if (langHint === '繁體中文') {
-    utterance.lang = 'zh-TW';
-  } else {
-    // Try auto-detecting language for Japanese, Korean, Chinese, English
-    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
-      // Contains kanji/hiragana/katakana
-      if (/[\u3040-\u30ff]/.test(text)) {
-        utterance.lang = 'ja-JP';
-      } else {
-        utterance.lang = 'zh-TW'; // Warning: Kanji-only Japanese words will fall here
-      }
-    } else if (/[\uac00-\ud7af]/.test(text)) {
+  // Small delay to fix iOS Safari bug where immediate speak() after cancel() is ignored
+  setTimeout(() => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // 1. Strong Auto-Detection for CJK (Overrides hallucinated langHints from AI)
+    if (/[\uac00-\ud7af]/.test(text)) {
+      // Contains Korean Hangul
       utterance.lang = 'ko-KR';
-    } else {
+    } else if (/[\u3040-\u30ff]/.test(text)) {
+      // Contains Japanese Hiragana/Katakana
+      utterance.lang = 'ja-JP';
+    } else if (langHint && /^[a-z]{2}(-[A-Z]{2})?$/.test(langHint)) {
+      // 2. Trust langHint if valid format
+      utterance.lang = langHint;
+    } else if (langHint === '日本語') {
+      utterance.lang = 'ja-JP';
+    } else if (langHint === '한국어') {
+      utterance.lang = 'ko-KR';
+    } else if (langHint === '繁體中文' || langHint === '簡體中文') {
       utterance.lang = 'zh-TW';
+    } else {
+      // 3. Fallback check for Chinese characters
+      if (/[\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
+        utterance.lang = 'zh-TW';
+      } else {
+        utterance.lang = 'en-US';
+      }
     }
-  }
 
-  utterance.rate = 0.95;
-  window.speechSynthesis.speak(utterance);
+    utterance.rate = 0.95;
+
+    // Split very long text into chunks to prevent Chrome TTS timeout bug (limit ~200 chars)
+    if (text.length > 200) {
+      const chunks = text.match(/.{1,200}(\s|。|，|、|！|？|,|\.|$)/g) || [text];
+      chunks.forEach((chunk) => {
+        const u = new SpeechSynthesisUtterance(chunk.trim());
+        u.lang = utterance.lang;
+        u.rate = utterance.rate;
+        window.speechSynthesis.speak(u);
+      });
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
+  }, 50);
 }
