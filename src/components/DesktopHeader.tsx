@@ -154,7 +154,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
               className="bg-transparent text-[13px] font-bold text-[var(--text-main)] outline-none cursor-pointer pr-1 underline decoration-[0.5px] underline-offset-4 decoration-[var(--text-main)]/30 group-hover:decoration-[var(--text-main)] transition-colors"
             >
               {TARGET_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>
+                <option key={lang.code} value={lang.code} className="text-[var(--text-main)] bg-white dark:bg-[#28211d]">
                   {lang.name}
                 </option>
               ))}
@@ -170,7 +170,7 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
               className="bg-transparent text-[13px] font-bold text-[var(--text-main)] outline-none cursor-pointer pr-1 underline decoration-[0.5px] underline-offset-4 decoration-[var(--text-main)]/30 group-hover:decoration-[var(--text-main)] transition-colors"
             >
               {AI_MODELS.map((m) => (
-                <option key={m.value} value={m.value}>
+                <option key={m.value} value={m.value} className="text-[var(--text-main)] bg-white dark:bg-[#28211d]">
                   {m.label}
                 </option>
               ))}

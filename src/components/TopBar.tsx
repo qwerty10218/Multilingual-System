@@ -89,7 +89,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               aria-label="選擇目標語言"
             >
               {TARGET_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code}>
+                <option key={lang.code} value={lang.code} className="text-[var(--text-main)] bg-white dark:bg-[#28211d]">
                   {lang.nativeName}
                 </option>
               ))}
