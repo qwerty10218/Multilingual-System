@@ -80,8 +80,11 @@ export function boxToPercent(box: [number, number, number, number]) {
  * Speech synthesis helper
  */
 let currentAudio: HTMLAudioElement | null = null;
+let currentSpeakId = 0; // 用於追蹤最新的朗讀任務，防止重複播放
 
 export async function speakText(text: string, langHint?: string) {
+  const speakId = ++currentSpeakId;
+
   // Stop existing playback
   if (currentAudio) {
     currentAudio.pause();
@@ -96,26 +99,33 @@ export async function speakText(text: string, langHint?: string) {
 
   // Small delay to fix iOS Safari bug where immediate speak() after cancel() is ignored
   setTimeout(async () => {
+    // 1. Resolve Language Locale
+    const langMap: Record<string, string> = {
+      '繁體中文': 'zh-TW',
+      '簡體中文': 'zh-CN',
+      'English': 'en-US',
+      '日本語': 'ja-JP',
+      '한국어': 'ko-KR',
+      'Français': 'fr-FR',
+      'Deutsch': 'de-DE',
+      'Español': 'es-ES',
+      'Tiếng Việt': 'vi-VN',
+      'ภาษาไทย': 'th-TH',
+    };
+    
     let lang = 'en-US';
 
-    // 1. Strong Auto-Detection for CJK (Overrides hallucinated langHints from AI)
+    // 強制特徵字元偵測 (優先級最高，防止 AI 語言辨識錯誤)
     if (/[\uac00-\ud7af]/.test(text)) {
-      lang = 'ko-KR'; // Korean
+      lang = 'ko-KR'; // 包含韓文
     } else if (/[\u3040-\u30ff]/.test(text)) {
-      lang = 'ja-JP'; // Japanese
+      lang = 'ja-JP'; // 包含日文假名
+    } else if (langHint && langMap[langHint]) {
+      lang = langMap[langHint];
     } else if (langHint && /^[a-z]{2}(-[A-Z]{2})?$/.test(langHint)) {
       lang = langHint;
-    } else if (langHint === '日本語') {
-      lang = 'ja-JP';
-    } else if (langHint === '한국어') {
-      lang = 'ko-KR';
-    } else if (langHint === '繁體中文' || langHint === '簡體中文') {
-      lang = 'zh-TW';
-    } else {
-      // 3. Fallback check for Chinese characters
-      if (/[\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
-        lang = 'zh-TW';
-      }
+    } else if (/[\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
+      lang = 'zh-TW'; // 包含中文字但沒被辨識出語系
     }
 
     try {
@@ -126,23 +136,32 @@ export async function speakText(text: string, langHint?: string) {
         body: JSON.stringify({ text, lang })
       });
 
+      // 檢查是否在此請求期間又有新的朗讀請求
+      if (speakId !== currentSpeakId) return;
+
       if (res.ok) {
         const blob = await res.blob();
+        if (speakId !== currentSpeakId) return; // double check
+
         const url = URL.createObjectURL(blob);
         currentAudio = new Audio(url);
         
-        // When audio finishes, revoke the object URL to prevent memory leaks
         currentAudio.onended = () => {
           URL.revokeObjectURL(url);
-          currentAudio = null;
+          if (currentAudio && currentAudio.src === url) {
+            currentAudio = null;
+          }
         };
 
         await currentAudio.play();
-        return; // Success! No need for Web Speech API fallback
+        return; // 成功播放 MP3，直接返回，不執行下方瀏覽器原生語音
       }
     } catch (err) {
       console.warn('High-quality TTS failed, falling back to browser synthesis', err);
     }
+
+    // 檢查是否在此請求期間又有新的朗讀請求
+    if (speakId !== currentSpeakId) return;
 
     // --- Fallback: Web Speech API ---
     if (!('speechSynthesis' in window)) {
