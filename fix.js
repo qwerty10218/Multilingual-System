@@ -1,0 +1,1 @@
+const fs = require('fs'); let code = fs.readFileSync('src/data/samples.ts', 'utf8'); code = code.replace(/category: '([^']+)'/g, \category: '\', sourceLanguage: 'ja-JP'\); fs.writeFileSync('src/data/samples.ts', code);
