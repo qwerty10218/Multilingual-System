@@ -144,8 +144,7 @@ ${sceneRule}
 ${customNote ? `特別補充需求：${customNote}` : ''}
 請讀取隨附的圖片，並嚴格遵守上述規範，僅輸出 JSON Array 格式結果。`;
 
-      const response = await ai.models.generateContent({
-        model: selectedModel,
+      const requestPayload = {
         contents: {
           parts: [
             {
@@ -187,7 +186,26 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
             },
           },
         },
-      });
+      };
+
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: selectedModel,
+          ...requestPayload
+        });
+      } catch (initialErr: any) {
+        // Fallback to flash-lite if the selected model is overloaded (503)
+        if (initialErr.message && initialErr.message.includes('503')) {
+          console.warn(`Model ${selectedModel} is overloaded (503). Falling back to gemini-3.1-flash-lite...`);
+          response = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            ...requestPayload
+          });
+        } else {
+          throw initialErr;
+        }
+      }
 
       const rawText = response.text || '[]';
       let items = [];
@@ -246,9 +264,21 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
       });
     } catch (err: any) {
       console.error('OCR Translate API Error:', err);
+      
+      let errorMessage = '無法處理圖片，請稍後再試。';
+      if (err.message) {
+        if (err.message.includes('503')) {
+          errorMessage = 'Google AI 伺服器目前過度擁擠（503），請稍後再試。';
+        } else if (err.message.includes('429')) {
+          errorMessage = 'API 請求次數已達上限，請稍後再試。';
+        } else if (err.message.includes('400')) {
+          errorMessage = '圖片格式或內容無法解析，請換一張圖片試試。';
+        }
+      }
+
       res.status(500).json({
         success: false,
-        error: err.message || '無法處理圖片，請稍後再試。',
+        error: errorMessage,
       });
     }
   });
