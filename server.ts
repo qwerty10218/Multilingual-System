@@ -25,7 +25,7 @@ function toMyMemoryCode(code: string): string {
 async function translateWithMyMemory(text: string, sourceLang: string, targetLang: string): Promise<string> {
   if (!text.trim()) return text;
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.substring(0, 500))}&langpair=${sourceLang}|${targetLang}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
   const data = await res.json() as any;
   if (data.responseStatus === 200 && data.responseData?.translatedText) {
     const translated = data.responseData.translatedText;
@@ -220,43 +220,44 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
         },
       };
 
-      // Retry logic with fallback model chain
-      const modelChain = [selectedModel, 'gemini-3.1-flash-lite'];
+      // Helper to add timeout to promise
+      const withTimeout = (promise: Promise<any>, ms: number) => {
+        let timeoutHandle: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error('TIMEOUT')), ms);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
+      };
+
+      // Fast fallback chain without long delays (max ~3-4s per attempt)
+      const modelChain = [
+        { model: selectedModel, timeout: 4000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 3000 }
+      ];
+      
       let response;
       let lastError: any = null;
 
-      for (const model of modelChain) {
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            response = await ai.models.generateContent({
-              model,
-              ...requestPayload
-            });
-            break; // Success — exit retry loop
-          } catch (err: any) {
-            lastError = err;
-            const msg = err.message || '';
-
-            if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED')) {
-              // Wait before retrying: 2s, 4s, 8s
-              const delay = Math.pow(2, attempt + 1) * 1000;
-              console.warn(`Model ${model} attempt ${attempt + 1} failed (${msg.substring(0, 80)}). Retrying in ${delay}ms...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              continue;
-            }
-
-            // Non-retryable error — break to try next model
-            break;
-          }
+      for (const config of modelChain) {
+        try {
+          const apiCall = ai.models.generateContent({
+            model: config.model,
+            ...requestPayload
+          });
+          response = await withTimeout(apiCall, config.timeout);
+          if (response) break; // Success
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Model ${config.model} failed or timed out:`, err.message || err);
+          continue;
         }
-        if (response) break; // Got a response, stop trying other models
       }
 
       // ── Last resort: OCR-only Gemini + MyMemory translation ──
       if (!response) {
         console.warn('All Gemini full-pipeline attempts failed. Trying OCR-only + MyMemory fallback...');
         try {
-          const ocrOnlyResponse = await ai.models.generateContent({
+          const ocrOnlyApiCall = ai.models.generateContent({
             model: 'gemini-3.1-flash-lite',
             contents: {
               parts: [
@@ -281,6 +282,7 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
               },
             },
           });
+          const ocrOnlyResponse = await withTimeout(ocrOnlyApiCall, 3000);
 
           const ocrRaw = ocrOnlyResponse.text || '[]';
           const ocrItems = JSON.parse(ocrRaw);
@@ -409,30 +411,35 @@ ${text}`;
       let translatedText = '';
       let lastError: any = null;
 
-      // Retry logic with fallback model chain
-      const modelChain = [selectedModel, 'gemini-3.1-flash-lite'];
-      for (const currentModel of modelChain) {
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            const response = await ai.models.generateContent({
-              model: currentModel,
-              contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
-            });
-            translatedText = (response.text || '').trim();
-            break;
-          } catch (err: any) {
-            lastError = err;
-            const msg = err.message || '';
-            if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED')) {
-              const delay = Math.pow(2, attempt + 1) * 1000;
-              console.warn(`Text Translation: Model ${currentModel} attempt ${attempt + 1} failed. Retrying in ${delay}ms...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              continue;
-            }
-            break;
-          }
+      // Helper to add timeout to promise
+      const withTimeout = (promise: Promise<any>, ms: number) => {
+        let timeoutHandle: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error('TIMEOUT')), ms);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
+      };
+
+      // Fast fallback chain without long delays (max ~3s per attempt)
+      const modelChain = [
+        { model: selectedModel, timeout: 3000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 2000 }
+      ];
+
+      for (const config of modelChain) {
+        try {
+          const apiCall = ai.models.generateContent({
+            model: config.model,
+            contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+          });
+          const response = await withTimeout(apiCall, config.timeout);
+          translatedText = (response.text || '').trim();
+          if (translatedText) break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Text Translation: Model ${config.model} failed or timed out:`, err.message || err);
+          continue;
         }
-        if (translatedText) break;
       }
 
       // Last resort: MyMemory API Fallback
