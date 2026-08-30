@@ -110,7 +110,7 @@ export const PocketBookModal: React.FC<PocketBookModalProps> = ({
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => speakText(item.original)}
+                        onClick={() => speakText(item.original, item.sourceLanguage)}
                         className="text-[#8a7f76] dark:text-[#9c938c] hover:text-[#4a3b32] dark:hover:text-[#e8e4db] p-1"
                         title="唸原文"
                       >

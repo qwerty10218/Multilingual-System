@@ -23,6 +23,7 @@ export interface OCRItem {
   translation: string;
   box_2d: [number, number, number, number]; // [ymin, xmin, ymax, xmax] 0-1000
   category: OCRCategory;
+  sourceLanguage?: string;
 }
 
 export interface TranslationResponse {
@@ -56,6 +57,7 @@ export interface SavedItem {
   note?: string;
   savedAt: number;
   sourceTitle?: string;
+  sourceLanguage?: string;
 }
 
 export type ViewMode = 'ar' | 'inspector' | 'split';

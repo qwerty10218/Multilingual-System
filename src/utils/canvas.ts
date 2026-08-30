@@ -89,22 +89,29 @@ export function speakText(text: string, langHint?: string) {
 
   const utterance = new SpeechSynthesisUtterance(text);
   
-  // Try auto-detecting language for Japanese, Korean, Chinese, English
-  if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
-    // Contains kanji/hiragana/katakana
-    if (/[\u3040-\u30ff]/.test(text)) {
-      utterance.lang = 'ja-JP';
-    } else {
-      utterance.lang = 'zh-TW';
-    }
-  } else if (/[\uac00-\ud7af]/.test(text)) {
-    utterance.lang = 'ko-KR';
+  // Use exact language hint if provided and looks like a language code
+  if (langHint && /^[a-z]{2}(-[A-Z]{2})?$/.test(langHint)) {
+    utterance.lang = langHint;
   } else if (langHint === '日本語') {
     utterance.lang = 'ja-JP';
   } else if (langHint === '한국어') {
     utterance.lang = 'ko-KR';
-  } else {
+  } else if (langHint === '繁體中文') {
     utterance.lang = 'zh-TW';
+  } else {
+    // Try auto-detecting language for Japanese, Korean, Chinese, English
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
+      // Contains kanji/hiragana/katakana
+      if (/[\u3040-\u30ff]/.test(text)) {
+        utterance.lang = 'ja-JP';
+      } else {
+        utterance.lang = 'zh-TW'; // Warning: Kanji-only Japanese words will fall here
+      }
+    } else if (/[\uac00-\ud7af]/.test(text)) {
+      utterance.lang = 'ko-KR';
+    } else {
+      utterance.lang = 'zh-TW';
+    }
   }
 
   utterance.rate = 0.95;

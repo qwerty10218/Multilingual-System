@@ -89,7 +89,7 @@ export const TranslationCard: React.FC<TranslationCardProps> = ({
         <div className={`border-t border-dashed border-[var(--text-main)]/10 ${compact ? 'py-2.5 mb-2' : 'py-3 mb-2'} flex flex-wrap items-center gap-3`}>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); speakText(item.original); }}
+            onClick={(e) => { e.stopPropagation(); speakText(item.original, item.sourceLanguage); }}
             className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-main)] hover:text-[var(--accent-blue)] transition-colors"
           >
             <Volume2 className="w-3.5 h-3.5" />

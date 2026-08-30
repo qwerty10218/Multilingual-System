@@ -120,7 +120,7 @@ export const PocketbookPage: React.FC<PocketbookPageProps> = ({
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => speakText(item.original)}
+                        onClick={() => speakText(item.original, item.sourceLanguage)}
                         aria-label="朗讀原文"
                         className="min-h-[36px] min-w-[36px] flex items-center justify-center text-[var(--text-main)]/50 hover:text-[var(--text-main)] transition-colors"
                       >

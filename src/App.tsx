@@ -132,6 +132,7 @@ export default function App() {
       original: item.original,
       translation: item.translation,
       category: item.category,
+      sourceLanguage: item.sourceLanguage,
       savedAt: Date.now(),
     }, ...prev]);
   };

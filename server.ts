@@ -136,6 +136,7 @@ ${sceneRule}
   - item: 主要品項 / 欄位名 / 路標地名
   - description: 說明文 / 成分 / 附註說明
   - notice: 警告 / 注意事項 / 營業時間
+- "sourceLanguage": 辨識出原文的語言代碼（例如：日文為 ja-JP，韓文為 ko-KR，繁體中文為 zh-TW，英文為 en-US 等）。
 
 【本次執行指令】
 目標語言：${targetLanguage}
@@ -177,8 +178,12 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
                   type: Type.STRING,
                   description: 'Category: title, item, description, notice',
                 },
+                sourceLanguage: {
+                  type: Type.STRING,
+                  description: 'Detected language code of the original text (e.g., ja-JP, ko-KR, en-US, zh-TW)',
+                },
               },
-              required: ['original', 'translation', 'box_2d', 'category'],
+              required: ['original', 'translation', 'box_2d', 'category', 'sourceLanguage'],
             },
           },
         },
@@ -229,6 +234,7 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
             category: ['title', 'item', 'description', 'notice'].includes(item.category)
               ? item.category
               : 'item',
+            sourceLanguage: item.sourceLanguage || 'zh-TW',
           };
         });
 
