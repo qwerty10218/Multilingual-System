@@ -492,20 +492,57 @@ ${text}`;
 2. 【過敏與飲食禁忌提示】：說明這項食品或產品是否可能包含常見過敏原（如蛋、奶、大豆、小麥/麩質、海鮮、花生、牛肉、豬肉、酒精、甲殼類等）或特定使用禁忌。
 3. 【旅遊實用句點餐/溝通語】：提供 1~2 句在現場可以直接向店員或路人說的在地短句（附帶羅馬拼音或注音/發音指南），例如如何點這道菜、詢問是否有不含特定成分版本等。`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents: prompt,
-      });
+      // Helper to add timeout to promise
+      const withTimeout = (promise: Promise<any>, ms: number) => {
+        let timeoutHandle: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error('TIMEOUT')), ms);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
+      };
+
+      const modelChain = [
+        { model: 'gemini-3.6-flash', timeout: 8000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 5000 }
+      ];
+      
+      let explanation = '';
+      let lastError: any = null;
+
+      for (const config of modelChain) {
+        try {
+          const apiCall = ai.models.generateContent({
+            model: config.model,
+            contents: prompt,
+          });
+          const response = await withTimeout(apiCall, config.timeout);
+          explanation = (response.text || '').trim();
+          if (explanation) break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Cultural Explain: Model ${config.model} failed or timed out:`, err.message || err);
+          continue;
+        }
+      }
+
+      if (!explanation) {
+        throw lastError || new Error('All models failed');
+      }
 
       res.json({
         success: true,
-        explanation: response.text,
+        explanation,
       });
     } catch (err: any) {
       console.error('Cultural Explain Error:', err);
+      let errorMessage = '無法產生文化解說，請稍後再試。';
+      if (err.message) {
+        if (err.message.includes('503')) errorMessage = 'Google AI 伺服器目前過度擁擠（503），請稍後再試。';
+        else if (err.message.includes('429')) errorMessage = 'API 請求次數已達上限，請稍後再試。';
+      }
       res.status(500).json({
         success: false,
-        error: err.message || '無法產生文化解說，請稍後再試。',
+        error: errorMessage,
       });
     }
   });
@@ -560,23 +597,58 @@ ${itemsSummary}
         });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents,
-        config: {
-          systemInstruction,
-        },
-      });
+      // Helper to add timeout to promise
+      const withTimeout = (promise: Promise<any>, ms: number) => {
+        let timeoutHandle: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error('TIMEOUT')), ms);
+        });
+        return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
+      };
+
+      const modelChain = [
+        { model: 'gemini-3.6-flash', timeout: 10000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 7000 }
+      ];
+      
+      let reply = '';
+      let lastError: any = null;
+
+      for (const config of modelChain) {
+        try {
+          const apiCall = ai.models.generateContent({
+            model: config.model,
+            contents,
+            config: { systemInstruction },
+          });
+          const response = await withTimeout(apiCall, config.timeout);
+          reply = (response.text || '').trim();
+          if (reply) break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Gemini Assistant: Model ${config.model} failed or timed out:`, err.message || err);
+          continue;
+        }
+      }
+
+      if (!reply) {
+        throw lastError || new Error('All models failed');
+      }
 
       res.json({
         success: true,
-        reply: response.text,
+        reply,
       });
     } catch (err: any) {
       console.error('Gemini Assistant API Error:', err);
+      let errorMessage = 'Gemini 隨身助手暫時無法回應，請稍後再試。';
+      if (err.message) {
+        if (err.message.includes('503')) errorMessage = 'Google AI 伺服器目前過度擁擠（503），請稍後再試。';
+        else if (err.message.includes('429')) errorMessage = 'API 請求次數已達上限，請稍後再試。';
+      }
       res.status(500).json({
         success: false,
-        error: err.message || 'Gemini 隨身助手暫時無法回應，請稍後再試。',
+        error: errorMessage,
       });
     }
   });
