@@ -21,6 +21,8 @@ function toMyMemoryCode(code: string): string {
   return code.split('-')[0];                 // ja-JP → ja, en-US → en
 }
 
+}
+
 // Translate a single text string via MyMemory API (free, no key needed)
 async function translateWithMyMemory(text: string, sourceLang: string, targetLang: string): Promise<string> {
   if (!text.trim()) return text;
@@ -36,6 +38,43 @@ async function translateWithMyMemory(text: string, sourceLang: string, targetLan
     return translated;
   }
   return text;
+}
+
+// ── Groq API Fallback ───────────────────────────────────────────────────
+async function fallbackToGroq(systemPrompt: string, userPrompt: string): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile', // Groq's fast and powerful model
+        messages: [
+          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.5,
+        max_tokens: 1024
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
+    
+    if (!res.ok) {
+      console.warn('Groq API returned status:', res.status);
+      return null;
+    }
+    
+    const data = await res.json() as any;
+    return data.choices?.[0]?.message?.content || null;
+  } catch (err) {
+    console.warn('Groq API Fallback failed:', err);
+    return null;
+  }
 }
 
 // Helper to safely extract clean base64 string and proper MIME type from any data URL or SVG input
@@ -88,19 +127,28 @@ async function startServer() {
   app.use(express.json({ limit: '25mb' }));
 
   // Initialize Gemini client lazily or handle missing key gracefully
-  const getAiClient = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY 尚未設定，請在 AI Studio 的 Secrets 面板設定 GEMINI_API_KEY。');
+  const getAiClients = () => {
+    const clients = [];
+    const key1 = process.env.GEMINI_API_KEY;
+    const key2 = process.env.GEMINI_API_KEY_2;
+    
+    if (key1) {
+      clients.push(new GoogleGenAI({
+        apiKey: key1,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+      }));
     }
-    return new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
-    });
+    if (key2) {
+      clients.push(new GoogleGenAI({
+        apiKey: key2,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+      }));
+    }
+
+    if (clients.length === 0) {
+      throw new Error('GEMINI_API_KEY 尚未設定，請在環境變數中設定。');
+    }
+    return clients;
   };
 
   // 1. Health check
@@ -123,8 +171,6 @@ async function startServer() {
 
       // Clean base64 string and resolve actual MIME type
       const { cleanBase64, mimeType: detectedMimeType } = parseAndNormalizeImage(imageBase64, mimeType);
-
-      const ai = getAiClient();
 
       let sceneRule = '';
       if (scene === 'food') {
@@ -238,53 +284,70 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
       let response;
       let lastError: any = null;
 
-      for (const config of modelChain) {
-        try {
-          const apiCall = ai.models.generateContent({
-            model: config.model,
-            ...requestPayload
-          });
-          response = await withTimeout(apiCall, config.timeout);
-          if (response) break; // Success
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`Model ${config.model} failed or timed out:`, err.message || err);
-          continue;
+      const aiClients = getAiClients();
+
+      outerLoop: for (const ai of aiClients) {
+        for (const config of modelChain) {
+          try {
+            const apiCall = ai.models.generateContent({
+              model: config.model,
+              ...requestPayload
+            });
+            response = await withTimeout(apiCall, config.timeout);
+            if (response) break outerLoop; // Success
+          } catch (err: any) {
+            lastError = err;
+            console.warn(`[Key fallback] Model ${config.model} failed or timed out:`, err.message || err);
+            continue;
+          }
         }
       }
 
       // ── Last resort: OCR-only Gemini + MyMemory translation ──
       if (!response) {
         console.warn('All Gemini full-pipeline attempts failed. Trying OCR-only + MyMemory fallback...');
-        try {
-          const ocrOnlyApiCall = ai.models.generateContent({
-            model: 'gemini-3.1-flash-lite',
-            contents: {
-              parts: [
-                { inlineData: { mimeType: detectedMimeType, data: cleanBase64 } },
-                { text: `從這張圖片中提取所有文字區塊。只做文字辨識，不需要翻譯。每個區塊包含：original（原文）、box_2d（[ymin,xmin,ymax,xmax] 0-1000）、category（title/item/description/notice）、sourceLanguage（偵測到的語言代碼如 ja-JP、en-US）。回傳 JSON Array。` },
-              ],
-            },
-            config: {
-              responseMimeType: 'application/json',
-              responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    original: { type: Type.STRING },
-                    box_2d: { type: Type.ARRAY, items: { type: Type.INTEGER } },
-                    category: { type: Type.STRING },
-                    sourceLanguage: { type: Type.STRING },
+        let ocrOnlyResponse;
+        
+        ocrLoop: for (const ai of aiClients) {
+          try {
+            const ocrOnlyApiCall = ai.models.generateContent({
+              model: 'gemini-3.1-flash-lite',
+              contents: {
+                parts: [
+                  { inlineData: { mimeType: detectedMimeType, data: cleanBase64 } },
+                  { text: `從這張圖片中提取所有文字區塊。只做文字辨識，不需要翻譯。每個區塊包含：original（原文）、box_2d（[ymin,xmin,ymax,xmax] 0-1000）、category（title/item/description/notice）、sourceLanguage（偵測到的語言代碼如 ja-JP、en-US）。回傳 JSON Array。` },
+                ],
+              },
+              config: {
+                responseMimeType: 'application/json',
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      original: { type: Type.STRING },
+                      box_2d: { type: Type.ARRAY, items: { type: Type.INTEGER } },
+                      category: { type: Type.STRING },
+                      sourceLanguage: { type: Type.STRING },
+                    },
+                    required: ['original', 'box_2d', 'category', 'sourceLanguage'],
                   },
-                  required: ['original', 'box_2d', 'category', 'sourceLanguage'],
                 },
               },
-            },
-          });
-          const ocrOnlyResponse = await withTimeout(ocrOnlyApiCall, 8000);
+            });
+            ocrOnlyResponse = await withTimeout(ocrOnlyApiCall, 8000);
+            if (ocrOnlyResponse) break ocrLoop;
+          } catch (err) {
+            console.warn('OCR-only fallback failed for one key, trying next...', err);
+            continue;
+          }
+        }
+        
+        if (!ocrOnlyResponse) {
+           throw new Error('All OCR models and keys failed');
+        }
 
-          const ocrRaw = ocrOnlyResponse.text || '[]';
+        const ocrRaw = ocrOnlyResponse.text || '[]';
           const ocrItems = JSON.parse(ocrRaw);
           const targetCode = TARGET_LANG_TO_CODE[targetLanguage] || 'en';
 
@@ -395,7 +458,6 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
         return res.status(400).json({ error: '請提供欲翻譯的文字' });
       }
 
-      const ai = getAiClient();
       const validModels = ['gemini-3.6-flash', 'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite'];
       const selectedModel = validModels.includes(model) ? model : 'gemini-3.6-flash';
 
@@ -426,19 +488,23 @@ ${text}`;
         { model: 'gemini-3.1-flash-lite', timeout: 3500 }
       ];
 
-      for (const config of modelChain) {
-        try {
-          const apiCall = ai.models.generateContent({
-            model: config.model,
-            contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
-          });
-          const response = await withTimeout(apiCall, config.timeout);
-          translatedText = (response.text || '').trim();
-          if (translatedText) break;
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`Text Translation: Model ${config.model} failed or timed out:`, err.message || err);
-          continue;
+      const aiClients = getAiClients();
+
+      textLoop: for (const ai of aiClients) {
+        for (const config of modelChain) {
+          try {
+            const apiCall = ai.models.generateContent({
+              model: config.model,
+              contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+            });
+            const response = await withTimeout(apiCall, config.timeout);
+            translatedText = (response.text || '').trim();
+            if (translatedText) break textLoop;
+          } catch (err: any) {
+            lastError = err;
+            console.warn(`Text Translation: [Key fallback] Model ${config.model} failed or timed out:`, err.message || err);
+            continue;
+          }
         }
       }
 
@@ -479,8 +545,6 @@ ${text}`;
         return res.status(400).json({ error: '請提供欲解說的原文文字' });
       }
 
-      const ai = getAiClient();
-
       const prompt = `你是一個專業的各國旅遊文化、美食知識與飲食過敏提示小幫手。
 使用者在旅遊或生活照片中辨識出了以下文字：
 - 原文：${original}
@@ -506,23 +570,37 @@ ${text}`;
         { model: 'gemini-3.1-flash-lite', timeout: 5000 }
       ];
       
+      const aiClients = getAiClients();
+
       let explanation = '';
       let lastError: any = null;
 
-      for (const config of modelChain) {
-        try {
-          const apiCall = ai.models.generateContent({
-            model: config.model,
-            contents: prompt,
-          });
-          const response = await withTimeout(apiCall, config.timeout);
-          explanation = (response.text || '').trim();
-          if (explanation) break;
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`Cultural Explain: Model ${config.model} failed or timed out:`, err.message || err);
-          continue;
+      explainLoop: for (const ai of aiClients) {
+        for (const config of modelChain) {
+          try {
+            const apiCall = ai.models.generateContent({
+              model: config.model,
+              contents: prompt,
+            });
+            const response = await withTimeout(apiCall, config.timeout);
+            explanation = (response.text || '').trim();
+            if (explanation) break explainLoop;
+          } catch (err: any) {
+            lastError = err;
+            console.warn(`Cultural Explain: [Key fallback] Model ${config.model} failed or timed out:`, err.message || err);
+            continue;
+          }
         }
+      }
+
+      // If all Gemini keys fail, fallback to Groq!
+      if (!explanation) {
+         console.warn('Cultural Explain: Gemini failed, trying Groq fallback...');
+         const groqSystemPrompt = '你是一個專業的各國旅遊文化、美食知識與飲食過敏提示小幫手。請直接輸出知識指南，不需多餘的客套話。';
+         const groqRes = await fallbackToGroq(groqSystemPrompt, prompt);
+         if (groqRes) {
+            explanation = groqRes;
+         }
       }
 
       if (!explanation) {
@@ -556,8 +634,6 @@ ${text}`;
       if (!userMessage) {
         return res.status(400).json({ error: '請提供提問內容' });
       }
-
-      const ai = getAiClient();
 
       const itemsSummary = ocrItems.length > 0
         ? ocrItems.map((item: any, i: number) => `${i + 1}. [${item.category}] 原文: "${item.original}" -> 譯文: "${item.translation}"`).join('\n')
@@ -612,24 +688,37 @@ ${itemsSummary}
         { model: 'gemini-3.1-flash-lite', timeout: 7000 }
       ];
       
+      const aiClients = getAiClients();
+
       let reply = '';
       let lastError: any = null;
 
-      for (const config of modelChain) {
-        try {
-          const apiCall = ai.models.generateContent({
-            model: config.model,
-            contents,
-            config: { systemInstruction },
-          });
-          const response = await withTimeout(apiCall, config.timeout);
-          reply = (response.text || '').trim();
-          if (reply) break;
-        } catch (err: any) {
-          lastError = err;
-          console.warn(`Gemini Assistant: Model ${config.model} failed or timed out:`, err.message || err);
-          continue;
+      assistantLoop: for (const ai of aiClients) {
+        for (const config of modelChain) {
+          try {
+            const apiCall = ai.models.generateContent({
+              model: config.model,
+              contents,
+              config: { systemInstruction },
+            });
+            const response = await withTimeout(apiCall, config.timeout);
+            reply = (response.text || '').trim();
+            if (reply) break assistantLoop;
+          } catch (err: any) {
+            lastError = err;
+            console.warn(`Gemini Assistant: [Key fallback] Model ${config.model} failed or timed out:`, err.message || err);
+            continue;
+          }
         }
+      }
+
+      // If all Gemini keys fail, fallback to Groq!
+      if (!reply) {
+         console.warn('Gemini Assistant: Gemini failed, trying Groq fallback...');
+         const groqRes = await fallbackToGroq(systemInstruction, userMessage);
+         if (groqRes) {
+            reply = groqRes;
+         }
       }
 
       if (!reply) {
