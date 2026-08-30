@@ -102,7 +102,13 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
       {/* relative so the FAB's absolute positioning works */}
       <main className="flex-1 overflow-hidden relative">
         {appMode === 'text' && activeTab === 'gallery' ? (
-           <TextTranslationPage targetLanguage={targetLanguage} selectedModel={selectedModel} />
+          <div className="h-full overflow-hidden">
+            <TextTranslationPage 
+              targetLanguage={targetLanguage} 
+              onTargetLanguageChange={onTargetLanguageChange}
+              selectedModel={selectedModel} 
+            />
+          </div>
         ) : activeTab === 'gallery' ? (
           <GalleryPage
             imageUrl={imageUrl}

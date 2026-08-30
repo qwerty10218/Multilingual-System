@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Copy, Volume2, X, RefreshCw } from 'lucide-react';
 import { speakText } from '../utils/canvas';
+import { TARGET_LANGUAGES } from '../data/samples';
 
 interface TextTranslationPageProps {
   targetLanguage: string;
+  onTargetLanguageChange?: (lang: string) => void;
   selectedModel: string;
 }
 
@@ -25,6 +27,7 @@ const getTTSLocale = (lang: string): string => {
 
 export const TextTranslationPage: React.FC<TextTranslationPageProps> = ({
   targetLanguage,
+  onTargetLanguageChange,
   selectedModel,
 }) => {
   const [sourceText, setSourceText] = useState('');
@@ -114,9 +117,23 @@ export const TextTranslationPage: React.FC<TextTranslationPageProps> = ({
       {/* ── 翻譯結果區 ── */}
       <div className="flex-1 flex flex-col bg-[#faf8f5] dark:bg-[#221c19] rounded-xl border border-[var(--text-main)]/10 shadow-sm overflow-hidden min-h-[40vh] md:min-h-0">
         <div className="flex items-center justify-between p-3 border-b border-[var(--text-main)]/5 bg-[var(--accent-red)]/5">
-          <span className="text-xs font-mono font-bold text-[var(--accent-red)]">
-            {targetLanguage}
-          </span>
+          <select
+            value={targetLanguage}
+            onChange={(e) => onTargetLanguageChange?.(e.target.value)}
+            className="text-xs font-mono font-bold text-[var(--accent-red)] bg-transparent border-none focus:ring-0 cursor-pointer pr-6 py-1 hover:bg-[var(--accent-red)]/10 rounded-md transition-colors appearance-none outline-none"
+            style={{
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%23c86d51\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")',
+              backgroundPosition: 'right 4px center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: '12px'
+            }}
+          >
+            {TARGET_LANGUAGES.map((lang) => (
+              <option key={lang} value={lang} className="text-[var(--text-main)] bg-white dark:bg-[#28211d]">
+                {lang}
+              </option>
+            ))}
+          </select>
           {translatedText && (
             <div className="flex gap-1">
               <button

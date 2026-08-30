@@ -99,6 +99,7 @@ export const DesktopLayout: React.FC<DesktopLayoutProps> = ({
         {appMode === 'text' ? (
           <TextTranslationPage
             targetLanguage={targetLanguage}
+            onTargetLanguageChange={onTargetLanguageChange}
             selectedModel={selectedModel}
           />
         ) : !imageUrl ? (
