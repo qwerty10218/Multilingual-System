@@ -37,7 +37,8 @@ export const ImageWithOverlay: React.FC<ImageWithOverlayProps> = ({
           const isSelected = selectedItemId === item.id;
 
           if (viewMode === 'text') {
-            // Text Replacement Mode - Minimalist highlight
+            // Text Replacement Mode — dark semi-transparent overlay with white text
+            const style = CATEGORY_STYLES[item.category as OCRCategory] || CATEGORY_STYLES.item;
             return (
               <div
                 key={item.id}
@@ -46,11 +47,26 @@ export const ImageWithOverlay: React.FC<ImageWithOverlayProps> = ({
                   onSelectItem(item);
                 }}
                 style={{ top, left, width, height }}
-                className={`absolute transition-all cursor-pointer pointer-events-auto flex items-center justify-center overflow-hidden p-1 bg-[var(--bg-panel)]/95 backdrop-blur-md border-l-2 border-[var(--accent-red)] ${
-                  isSelected ? 'z-20 scale-[1.02] shadow-sm' : 'z-10'
+                className={`absolute transition-all cursor-pointer pointer-events-auto flex items-center justify-center overflow-hidden ${
+                  isSelected ? 'z-20 ring-2 ring-white/80 shadow-lg' : 'z-10'
                 }`}
               >
-                <span className="text-[var(--text-main)] font-sans font-bold text-center leading-tight flex items-center justify-center w-full h-full" style={{ fontSize: 'min(14px, max(11px, 2.5cqi))', containerType: 'inline-size' }}>
+                {/* Dark overlay background */}
+                <div className="absolute inset-0 bg-black/70" />
+
+                {/* Numbered badge — top-left corner */}
+                <span
+                  className="absolute top-0.5 left-0.5 min-w-[16px] h-[16px] rounded-full flex items-center justify-center text-[9px] font-sans font-bold text-white z-10"
+                  style={{ backgroundColor: style.borderColor }}
+                >
+                  {index + 1}
+                </span>
+
+                {/* Translation text */}
+                <span
+                  className="relative z-10 text-white font-sans font-bold text-center leading-snug px-1 drop-shadow-sm"
+                  style={{ fontSize: `clamp(9px, ${Math.min(parseFloat(height), parseFloat(width)) * 0.35}vw, 14px)` }}
+                >
                   {item.translation}
                 </span>
               </div>
