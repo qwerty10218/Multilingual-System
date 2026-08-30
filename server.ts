@@ -6,6 +6,38 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// ── MyMemory Translation API (Free backup) ──────────────────────────
+// Maps our app's target language display names to ISO codes for MyMemory
+const TARGET_LANG_TO_CODE: Record<string, string> = {
+  '繁體中文': 'zh-TW', '簡體中文': 'zh-CN', 'English': 'en',
+  '日本語': 'ja', '한국어': 'ko', 'Français': 'fr',
+  'Deutsch': 'de', 'Español': 'es', 'Tiếng Việt': 'vi', 'ภาษาไทย': 'th',
+};
+
+// Converts sourceLanguage codes like 'ja-JP' to MyMemory format
+function toMyMemoryCode(code: string): string {
+  if (!code) return 'auto';
+  if (code.startsWith('zh-')) return code;   // keep zh-TW / zh-CN as-is
+  return code.split('-')[0];                 // ja-JP → ja, en-US → en
+}
+
+// Translate a single text string via MyMemory API (free, no key needed)
+async function translateWithMyMemory(text: string, sourceLang: string, targetLang: string): Promise<string> {
+  if (!text.trim()) return text;
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.substring(0, 500))}&langpair=${sourceLang}|${targetLang}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const data = await res.json() as any;
+  if (data.responseStatus === 200 && data.responseData?.translatedText) {
+    const translated = data.responseData.translatedText;
+    // MyMemory sometimes returns all-caps "QUERY LENGTH LIMIT..." error text
+    if (translated.startsWith('QUERY LENGTH LIMIT') || translated.startsWith('NO QUERY SPECIFIED')) {
+      return text;
+    }
+    return translated;
+  }
+  return text;
+}
+
 // Helper to safely extract clean base64 string and proper MIME type from any data URL or SVG input
 function parseAndNormalizeImage(input: string, fallbackMime: string = 'image/jpeg'): { cleanBase64: string; mimeType: string } {
   const trimmed = (input || '').trim();
@@ -220,8 +252,60 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
         if (response) break; // Got a response, stop trying other models
       }
 
+      // ── Last resort: OCR-only Gemini + MyMemory translation ──
       if (!response) {
-        throw lastError || new Error('所有模型皆無法回應');
+        console.warn('All Gemini full-pipeline attempts failed. Trying OCR-only + MyMemory fallback...');
+        try {
+          const ocrOnlyResponse = await ai.models.generateContent({
+            model: 'gemini-3.1-flash-lite',
+            contents: {
+              parts: [
+                { inlineData: { mimeType: detectedMimeType, data: cleanBase64 } },
+                { text: `從這張圖片中提取所有文字區塊。只做文字辨識，不需要翻譯。每個區塊包含：original（原文）、box_2d（[ymin,xmin,ymax,xmax] 0-1000）、category（title/item/description/notice）、sourceLanguage（偵測到的語言代碼如 ja-JP、en-US）。回傳 JSON Array。` },
+              ],
+            },
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    original: { type: Type.STRING },
+                    box_2d: { type: Type.ARRAY, items: { type: Type.INTEGER } },
+                    category: { type: Type.STRING },
+                    sourceLanguage: { type: Type.STRING },
+                  },
+                  required: ['original', 'box_2d', 'category', 'sourceLanguage'],
+                },
+              },
+            },
+          });
+
+          const ocrRaw = ocrOnlyResponse.text || '[]';
+          const ocrItems = JSON.parse(ocrRaw);
+          const targetCode = TARGET_LANG_TO_CODE[targetLanguage] || 'en';
+
+          // Translate each item in parallel via MyMemory
+          const translatedItems = await Promise.all(
+            (Array.isArray(ocrItems) ? ocrItems : []).map(async (item: any) => {
+              const srcCode = toMyMemoryCode(item.sourceLanguage || '');
+              try {
+                const translated = await translateWithMyMemory(item.original, srcCode, targetCode);
+                return { ...item, translation: translated };
+              } catch {
+                return { ...item, translation: item.original };
+              }
+            })
+          );
+
+          // Synthesize a response object compatible with the downstream parser
+          response = { text: JSON.stringify(translatedItems) } as any;
+          console.log(`MyMemory fallback succeeded: ${translatedItems.length} items translated.`);
+        } catch (fallbackErr: any) {
+          console.error('MyMemory fallback also failed:', fallbackErr);
+          throw lastError || fallbackErr || new Error('所有翻譯服務皆無法回應');
+        }
       }
 
       const rawText = response.text || '[]';
