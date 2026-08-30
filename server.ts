@@ -526,7 +526,8 @@ ${text}`;
       }
 
       if (!explanation) {
-        throw lastError || new Error('All models failed');
+        console.warn('Cultural Explain: All AI models failed, using smart fallback template.');
+        explanation = `【專有名詞與背景由來】\n這是一項名為「${original}」的項目，在地意思為「${translation}」。建議您在當地體驗時，留意其獨特的在地特色與風情。\n\n【過敏與飲食禁忌提示】\n（目前連線壅塞，無法為您深度分析過敏原）\n若您有嚴重的飲食禁忌（如海鮮、花生、奶蛋等），請務必在點餐或購買前親自向服務人員確認。\n\n【旅遊實用句點餐/溝通語】\n您可以使用翻譯功能向店員表達：\n1. 「請問這個可以點嗎？」\n2. 「請問裡面有含海鮮/花生/過敏原嗎？」`;
       }
 
       res.json({
@@ -632,7 +633,8 @@ ${itemsSummary}
       }
 
       if (!reply) {
-        throw lastError || new Error('All models failed');
+        console.warn('Gemini Assistant: All AI models failed, using smart fallback template.');
+        reply = `不好意思，目前我的伺服器大塞車（API 呼叫次數已達上限）。\n\n不過別擔心！您可以先使用上方的「文字翻譯」功能來應急，或是稍等一兩分鐘後再問我一次喔！`;
       }
 
       res.json({
