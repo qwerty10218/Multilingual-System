@@ -16,7 +16,7 @@ const TARGET_LANG_TO_CODE: Record<string, string> = {
 
 // Converts sourceLanguage codes like 'ja-JP' to MyMemory format
 function toMyMemoryCode(code: string): string {
-  if (!code) return 'auto';
+  if (!code) return 'Autodetect';
   if (code.startsWith('zh-')) return code;   // keep zh-TW / zh-CN as-is
   return code.split('-')[0];                 // ja-JP → ja, en-US → en
 }
@@ -229,10 +229,10 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
         return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
       };
 
-      // Fast fallback chain without long delays (max ~3-4s per attempt)
+      // Fast fallback chain without long delays
       const modelChain = [
-        { model: selectedModel, timeout: 4000 },
-        { model: 'gemini-3.1-flash-lite', timeout: 3000 }
+        { model: selectedModel, timeout: 6000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 4000 }
       ];
       
       let response;
@@ -420,10 +420,10 @@ ${text}`;
         return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
       };
 
-      // Fast fallback chain without long delays (max ~3s per attempt)
+      // Fast fallback chain without long delays
       const modelChain = [
-        { model: selectedModel, timeout: 3000 },
-        { model: 'gemini-3.1-flash-lite', timeout: 2000 }
+        { model: selectedModel, timeout: 5000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 3500 }
       ];
 
       for (const config of modelChain) {
@@ -447,9 +447,9 @@ ${text}`;
         console.warn('Text Translation: All Gemini attempts failed. Trying MyMemory fallback...');
         try {
           const targetCode = TARGET_LANG_TO_CODE[targetLanguage] || 'en';
-          // auto detect source via MyMemory
-          translatedText = await translateWithMyMemory(text, 'auto', targetCode);
-          if (translatedText === text) {
+          // auto detect source via MyMemory using 'Autodetect'
+          translatedText = await translateWithMyMemory(text, 'Autodetect', targetCode);
+          if (translatedText === text && text.length > 3) {
              throw new Error('MyMemory failed to translate.');
           }
         } catch (fallbackErr: any) {
