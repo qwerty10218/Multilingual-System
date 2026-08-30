@@ -25,7 +25,7 @@ function toMyMemoryCode(code: string): string {
 async function translateWithMyMemory(text: string, sourceLang: string, targetLang: string): Promise<string> {
   if (!text.trim()) return text;
   const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.substring(0, 500))}&langpair=${sourceLang}|${targetLang}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(4500) });
   const data = await res.json() as any;
   if (data.responseStatus === 200 && data.responseData?.translatedText) {
     const translated = data.responseData.translatedText;
@@ -229,10 +229,10 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
         return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutHandle));
       };
 
-      // Fast fallback chain without long delays
+      // Fast fallback chain without long delays (but realistic for multimodal OCR)
       const modelChain = [
-        { model: selectedModel, timeout: 6000 },
-        { model: 'gemini-3.1-flash-lite', timeout: 4000 }
+        { model: selectedModel, timeout: 12000 },
+        { model: 'gemini-3.1-flash-lite', timeout: 8000 }
       ];
       
       let response;
@@ -282,7 +282,7 @@ ${customNote ? `特別補充需求：${customNote}` : ''}
               },
             },
           });
-          const ocrOnlyResponse = await withTimeout(ocrOnlyApiCall, 3000);
+          const ocrOnlyResponse = await withTimeout(ocrOnlyApiCall, 8000);
 
           const ocrRaw = ocrOnlyResponse.text || '[]';
           const ocrItems = JSON.parse(ocrRaw);
