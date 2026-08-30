@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- Viewport with safe area support for iPhone notch/home indicator -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA / Web App manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Shippori+Mincho:wght@400;700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+
+    <!-- Theme color (light / dark) -->
+    <meta name="theme-color" content="#F4EEDC" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#211C16" media="(prefers-color-scheme: dark)" />
+
+    <!-- iOS PWA meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="視覺翻譯官" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- SEO / description -->
+    <meta name="description" content="拍照即翻：使用 Gemini AI 辨識圖片文字並即時翻譯，旅遊必備的多語言視覺翻譯工具。" />
+
+    <title>多語系視覺 OCR 隨身翻譯官</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register Service Worker for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch((err) => {
+            console.warn('SW registration failed:', err);
+          });
+        });
+      }
+    </script>
+  </body>
+</html>

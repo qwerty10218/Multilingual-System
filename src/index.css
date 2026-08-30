@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Noto Sans TC', sans-serif;
+  --font-serif: 'Shippori Mincho', serif;
+  --font-mono: 'Space Mono', monospace;
+  
+  --color-page: var(--bg-page);
+  --color-panel: var(--bg-panel);
+  --color-main: var(--text-main);
+  --color-accent-red: var(--accent-red);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-green: var(--accent-green);
+}
+
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-page: #F4EEDC; /* 鳥の子色 */
+    --bg-panel: #ECE2C9; /* 生成り色 */
+    --text-main: #2F2A22; /* 墨色 */
+    --accent-red: #9B3A2C; /* 弁柄色 */
+    --accent-blue: #3F6E8C; /* 縹色 */
+    --accent-green: #6E7B4E; /* 苔色 */
+  }
+
+  .dark {
+    --bg-page: #211C16;
+    --bg-panel: #2A241D;
+    --text-main: #FDFBF7;
+    --accent-red: #D95A4A;
+    --accent-blue: #5C94B8;
+    --accent-green: #98A86D;
+  }
+
+  body {
+    @apply transition-colors duration-200 bg-page text-main font-sans;
+  }
+
+  /* Subtle noise texture */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+
+
+  /* Prevent content from being obscured by iOS home indicator or notch */
+  :root {
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+}
+
+@layer utilities {
+  /* Safe area padding helpers */
+  .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+  .pb-safe { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+  .pl-safe { padding-left: max(1rem, env(safe-area-inset-left)); }
+  .pr-safe { padding-right: max(1rem, env(safe-area-inset-right)); }
+
+  /* Hide scrollbar while keeping scroll functionality */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Smooth momentum scrolling on iOS */
+  .scroll-smooth-ios {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}

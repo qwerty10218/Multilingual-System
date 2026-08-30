@@ -1,0 +1,36 @@
+{
+  "name": "多語系視覺 OCR 隨身翻譯官",
+  "short_name": "視覺翻譯官",
+  "description": "拍照即翻：使用 Gemini AI 辨識圖片文字並即時翻譯，旅遊必備的多語言視覺翻譯工具。",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#f5f3ef",
+  "background_color": "#f5f3ef",
+  "lang": "zh-TW",
+  "categories": ["travel", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "開啟相機翻譯",
+      "short_name": "拍照翻譯",
+      "description": "立即開啟相機進行 OCR 翻譯",
+      "url": "/?tab=camera",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

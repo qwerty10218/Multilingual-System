@@ -1,0 +1,6 @@
+{
+  "name": "多語系視覺 OCR 兼隨身翻譯官",
+  "description": "專為旅遊與生活場景設計的多語系視覺 OCR 兼隨身翻譯系統，支援菜單、告示、標籤及路標的區域辨識、AR 原圖覆蓋與語音朗讀。",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
