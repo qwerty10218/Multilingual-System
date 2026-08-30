@@ -129,8 +129,8 @@ export const TextTranslationPage: React.FC<TextTranslationPageProps> = ({
             }}
           >
             {TARGET_LANGUAGES.map((lang) => (
-              <option key={lang} value={lang} className="text-[var(--text-main)] bg-white dark:bg-[#28211d]">
-                {lang}
+              <option key={lang.code} value={lang.code} className="text-[var(--text-main)] bg-white dark:bg-[#28211d]">
+                {lang.name}
               </option>
             ))}
           </select>

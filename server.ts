@@ -653,6 +653,47 @@ ${itemsSummary}
     }
   });
 
+  // 5. Unofficial High-Quality TTS Proxy (Google Translate API)
+  app.post('/api/tts', async (req, res) => {
+    try {
+      const { text, lang } = req.body;
+      if (!text || !lang) {
+        return res.status(400).json({ error: 'Missing text or lang' });
+      }
+
+      // Google TTS has a ~200 char limit. Split into safe chunks
+      const chunks = text.match(/.{1,200}(\s|。|，|、|！|？|,|\.|$)/g) || [text];
+      
+      const buffers = [];
+      for (const chunk of chunks) {
+        if (!chunk.trim()) continue;
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(chunk.trim())}`;
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer': 'https://translate.google.com/'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`TTS fetch failed with status ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        buffers.push(Buffer.from(arrayBuffer));
+      }
+
+      const finalBuffer = Buffer.concat(buffers);
+      
+      res.set('Content-Type', 'audio/mpeg');
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.send(finalBuffer);
+    } catch (err: any) {
+      console.error('TTS Proxy Error:', err);
+      res.status(500).json({ error: 'TTS Generation failed' });
+    }
+  });
+
   // Vite Integration
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

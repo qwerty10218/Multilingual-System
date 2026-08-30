@@ -79,52 +79,104 @@ export function boxToPercent(box: [number, number, number, number]) {
 /**
  * Speech synthesis helper
  */
-export function speakText(text: string, langHint?: string) {
-  if (!('speechSynthesis' in window)) {
-    alert('您的瀏覽器不支援語音合成朗讀功能');
-    return;
-  }
+let currentAudio: HTMLAudioElement | null = null;
 
-  window.speechSynthesis.cancel(); // Stop current
+export async function speakText(text: string, langHint?: string) {
+  // Stop existing playback
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  
+  if (!text) return;
 
   // Small delay to fix iOS Safari bug where immediate speak() after cancel() is ignored
-  setTimeout(() => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    
+  setTimeout(async () => {
+    let lang = 'en-US';
+
     // 1. Strong Auto-Detection for CJK (Overrides hallucinated langHints from AI)
     if (/[\uac00-\ud7af]/.test(text)) {
-      // Contains Korean Hangul
-      utterance.lang = 'ko-KR';
+      lang = 'ko-KR'; // Korean
     } else if (/[\u3040-\u30ff]/.test(text)) {
-      // Contains Japanese Hiragana/Katakana
-      utterance.lang = 'ja-JP';
+      lang = 'ja-JP'; // Japanese
     } else if (langHint && /^[a-z]{2}(-[A-Z]{2})?$/.test(langHint)) {
-      // 2. Trust langHint if valid format
-      utterance.lang = langHint;
+      lang = langHint;
     } else if (langHint === '日本語') {
-      utterance.lang = 'ja-JP';
+      lang = 'ja-JP';
     } else if (langHint === '한국어') {
-      utterance.lang = 'ko-KR';
+      lang = 'ko-KR';
     } else if (langHint === '繁體中文' || langHint === '簡體中文') {
-      utterance.lang = 'zh-TW';
+      lang = 'zh-TW';
     } else {
       // 3. Fallback check for Chinese characters
       if (/[\u3400-\u4dbf\u4e00-\u9fff]/.test(text)) {
-        utterance.lang = 'zh-TW';
-      } else {
-        utterance.lang = 'en-US';
+        lang = 'zh-TW';
       }
     }
 
+    try {
+      // 嘗試使用自建的高品質 TTS 代理 (Google Translate Neural Voices)
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, lang })
+      });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        currentAudio = new Audio(url);
+        
+        // When audio finishes, revoke the object URL to prevent memory leaks
+        currentAudio.onended = () => {
+          URL.revokeObjectURL(url);
+          currentAudio = null;
+        };
+
+        await currentAudio.play();
+        return; // Success! No need for Web Speech API fallback
+      }
+    } catch (err) {
+      console.warn('High-quality TTS failed, falling back to browser synthesis', err);
+    }
+
+    // --- Fallback: Web Speech API ---
+    if (!('speechSynthesis' in window)) {
+      alert('您的瀏覽器不支援語音合成朗讀功能');
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
     utterance.rate = 0.95;
 
-    // Split very long text into chunks to prevent Chrome TTS timeout bug (limit ~200 chars)
+    // 嘗試尋找較佳的瀏覽器語音 (如 Google 雲端語音)
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      // 優先尋找 Google 的雲端語音 (品質較好)
+      let bestVoice = voices.find(v => v.lang.startsWith(lang.split('-')[0]) && v.name.includes('Google'));
+      // 其次尋找 Premium 語音 (如 iOS/macOS 的 Premium)
+      if (!bestVoice) bestVoice = voices.find(v => v.lang.startsWith(lang.split('-')[0]) && v.name.includes('Premium'));
+      // 否則就拿第一個符合語言的
+      if (!bestVoice) bestVoice = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+      
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+      }
+    }
+
+    // 處理長文字切分，防止 Chrome 唸到一半卡死
     if (text.length > 200) {
       const chunks = text.match(/.{1,200}(\s|。|，|、|！|？|,|\.|$)/g) || [text];
       chunks.forEach((chunk) => {
         const u = new SpeechSynthesisUtterance(chunk.trim());
         u.lang = utterance.lang;
         u.rate = utterance.rate;
+        if (utterance.voice) u.voice = utterance.voice;
         window.speechSynthesis.speak(u);
       });
     } else {
