@@ -7,6 +7,22 @@ interface TextTranslationPageProps {
   selectedModel: string;
 }
 
+const getTTSLocale = (lang: string): string => {
+  const map: Record<string, string> = {
+    '繁體中文': 'zh-TW',
+    '簡體中文': 'zh-CN',
+    'English': 'en-US',
+    '日本語': 'ja-JP',
+    '한국어': 'ko-KR',
+    'Français': 'fr-FR',
+    'Deutsch': 'de-DE',
+    'Español': 'es-ES',
+    'Tiếng Việt': 'vi-VN',
+    'ภาษาไทย': 'th-TH'
+  };
+  return map[lang] || 'zh-TW';
+};
+
 export const TextTranslationPage: React.FC<TextTranslationPageProps> = ({
   targetLanguage,
   selectedModel,
@@ -111,7 +127,7 @@ export const TextTranslationPage: React.FC<TextTranslationPageProps> = ({
                 <Copy className="w-4 h-4" />
               </button>
               <button
-                onClick={() => speakText(translatedText, targetLanguage === '英文' ? 'en-US' : 'zh-TW')}
+                onClick={() => speakText(translatedText, getTTSLocale(targetLanguage))}
                 className="p-1.5 rounded-md text-[var(--text-main)]/50 hover:text-[var(--text-main)] hover:bg-[var(--text-main)]/10 transition-colors"
                 title="朗讀"
               >
